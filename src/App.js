@@ -1,7 +1,8 @@
 import React, { Component } from "react";
-import axios from "axios";
-import UserForm from "./components/UserForm";
+import AddUserForm from "./components/AddUserForm";
+import EditUserForm from "./components/EditUserForm";
 import UserList from "./components/UserList";
+import "./App.css";
 
 class App extends Component {
   constructor(props) {
@@ -10,6 +11,8 @@ class App extends Component {
       users: [],
       formData: { name: "", email: "" },
       editingUser: null,
+      showAddModal: false,
+      showEditModal: false,
     };
   }
 
@@ -19,8 +22,9 @@ class App extends Component {
 
   fetchUsers = async () => {
     try {
-      const response = await axios.get("/users");
-      this.setState({ users: response.data.users });
+      const response = await fetch("/users");
+      const data = await response.json();
+      this.setState({ users: data });
     } catch (error) {
       console.error("Error fetching users:", error);
     }
@@ -29,10 +33,18 @@ class App extends Component {
   handleAddUser = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.post("/users", this.state.formData);
+      const response = await fetch("/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(this.state.formData),
+      });
+      const newUser = await response.json();
       this.setState((prevState) => ({
-        users: [...prevState.users, response.data],
+        users: [...prevState.users, newUser],
         formData: { name: "", email: "" },
+        showAddModal: false,
       }));
     } catch (error) {
       console.error("Error adding user:", error);
@@ -41,8 +53,11 @@ class App extends Component {
 
   handleDeleteUser = async (id) => {
     try {
-      const response = await axios.delete(`/users/${id}`);
-      if (response.data.success) {
+      const response = await fetch(`/users/${id}`, {
+        method: "DELETE",
+      });
+      const result = await response.json();
+      if (Object.keys(result).length === 0) {
         this.setState((prevState) => ({
           users: prevState.users.filter((user) => user.id !== id),
         }));
@@ -56,16 +71,20 @@ class App extends Component {
     this.setState({
       editingUser: user,
       formData: { name: user.name, email: user.email },
+      showEditModal: true,
     });
   };
 
   handleUpdateUser = async (e) => {
     e.preventDefault();
     try {
-      const response = await axios.patch(
-        `/users/${this.state.editingUser.id}`,
-        this.state.formData
-      );
+      await fetch(`/users/${this.state.editingUser.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(this.state.formData),
+      });
       this.setState((prevState) => ({
         users: prevState.users.map((user) =>
           user.id === prevState.editingUser.id
@@ -74,6 +93,7 @@ class App extends Component {
         ),
         editingUser: null,
         formData: { name: "", email: "" },
+        showEditModal: false,
       }));
     } catch (error) {
       console.error("Error updating user:", error);
@@ -86,17 +106,59 @@ class App extends Component {
     }));
   };
 
+  toggleAddModal = () => {
+    this.setState((prevState) => ({
+      showAddModal: !prevState.showAddModal,
+      formData: { name: "", email: "" },
+    }));
+  };
+
+  toggleEditModal = () => {
+    this.setState((prevState) => ({
+      showEditModal: !prevState.showEditModal,
+      editingUser: null,
+      formData: { name: "", email: "" },
+    }));
+  };
+
   render() {
-    const { users, formData, editingUser } = this.state;
+    const { users, formData, editingUser, showAddModal, showEditModal } =
+      this.state;
     return (
-      <div>
-        <h1>User Management</h1>
-        <UserForm
-          formData={formData}
-          onInputChange={this.handleInputChange}
-          onSubmit={editingUser ? this.handleUpdateUser : this.handleAddUser}
-          editingUser={editingUser}
-        />
+      <div className="app-container">
+        <h1 className="app-title">User Management</h1>
+        <button className="add-user-button" onClick={this.toggleAddModal}>
+          Add User
+        </button>
+        {showAddModal && (
+          <div className="modal">
+            <div className="modal-content">
+              <AddUserForm
+                formData={formData}
+                onInputChange={this.handleInputChange}
+                onSubmit={this.handleAddUser}
+              />
+              <button className="close-button" onClick={this.toggleAddModal}>
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+        {showEditModal && (
+          <div className="modal">
+            <div className="modal-content">
+              <EditUserForm
+                formData={formData}
+                onInputChange={this.handleInputChange}
+                onSubmit={this.handleUpdateUser}
+                editingUser={editingUser}
+              />
+              <button className="close-button" onClick={this.toggleEditModal}>
+                Close
+              </button>
+            </div>
+          </div>
+        )}
         <UserList
           users={users}
           onEditUser={this.handleEditUser}
